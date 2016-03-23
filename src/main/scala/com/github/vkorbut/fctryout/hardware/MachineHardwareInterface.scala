@@ -24,22 +24,23 @@ trait MachineHardwareInterface {
    * to insert money into machine
    * @param active <code>true</code> if cash acceptor should become active, <code> false</code> otherwise. 
    */
-  def cashAcceptorMode(active: Boolean)
+  def setCashAcceptorEnabled(active: Boolean)
 
-  def buttonHighlightMode(buttonName: String, highlighted: Boolean)
+  def setButtonHighlighted(buttonName: String, highlighted: Boolean)
 
   /**
    * Used for enabling/disabling buttons due to invalid conditions for products.
    * @param buttonName button to be disabled
    * @param enabled state of the button
    */
-  def buttonEnableMode(buttonName: String, enabled: Boolean)
+  def setButtonEnabled(buttonName: String, enabled: Boolean)
 
+  def priceForProduct(buttonName: String):Option[BigDecimal]
   /**
-   * Prepares and returns the product to the user.
+   * Prepares and realize the product to the user.
    * @param buttonName selected product identified by appropriate button.
    */
-  def prepareProduct(buttonName: String)
+  def prepareAndSellProduct(buttonName: String)
 
   /**
    * Listener to hardware events

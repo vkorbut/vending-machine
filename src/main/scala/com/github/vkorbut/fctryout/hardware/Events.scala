@@ -7,5 +7,5 @@ trait Event
 case class CancelPressed() extends Event
 case class ProductSelected(productName:String) extends Event
 case class CashCommitted(amount:BigDecimal) extends Event
-case class BrewingComplete() extends Event
+case class SellingComplete() extends Event
 case class ChangeReturned(amount:BigDecimal) extends Event
