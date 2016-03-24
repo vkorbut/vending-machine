@@ -13,7 +13,20 @@ case class ProductSelection(override val deposit:BigDecimal, selected:Option[Str
 case class Selling(override val deposit:BigDecimal, product:String) extends State
 case class ReturningChange(override val deposit:BigDecimal, change:BigDecimal) extends State
 
-class Actions(hardware: MachineHardwareInterface) {
+class MachineRuntime(hardware: MachineHardwareInterface, val productPrices: Map[String, BigDecimal]) {
+  hardware.hwEventHandler = Option(onEvent _)
+
+  var currentState: State = ProductSelection(0, None)
+
+  def onEvent(event: Event): Unit = {
+    currentState = actions
+      .find(_.isDefinedAt((currentState, event)))
+      .map(_.apply(currentState, event))
+      .getOrElse(currentState)
+  }
+
+  def priceForProduct(name: String) = productPrices.get(name)
+
   type Action = PartialFunction[(State, Event), State]
 
   val cancelAction: Action = {
@@ -39,12 +52,12 @@ class Actions(hardware: MachineHardwareInterface) {
           hardware.returnChange(newDeposit)
           ReturningChange(newDeposit, newDeposit)
         case Some(product) =>
-          val price = hardware.priceForProduct(product)
+          val price = priceForProduct(product)
           if (price.isDefined && price.get <= newDeposit) {
             hardware.prepareAndSellProduct(product)
             Selling(newDeposit, product)
           } else {
-            currentState
+            currentState.copy(deposit = newDeposit)
           }
       }
     case (s: Selling, CashCommitted(amount)) => s.copy(deposit = s.deposit + amount)
@@ -53,7 +66,7 @@ class Actions(hardware: MachineHardwareInterface) {
 
   val sellingCompleteAction: Action = {
     case (Selling(deposit, product), SellingComplete()) =>
-      val change = hardware.priceForProduct(product) match {
+      val change = priceForProduct(product) match {
         case Some(price) => deposit - price;
         case None =>
           hardware.logError(s"No price for product $product. Assuming 0")
@@ -74,10 +87,9 @@ class Actions(hardware: MachineHardwareInterface) {
       ProductSelection(0, None)
   }
 
-
   def resetHardware(): Unit = {
     hardware.setCashAcceptorEnabled(false)
-    hardware.buttonNames.foreach(hardware.setButtonEnabled(_, enabled = false))
+    hardware.buttonNames.foreach(hardware.setButtonHighlighted(_, highlighted = false))
   }
 
   val actions = Seq(
