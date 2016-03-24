@@ -1,22 +1,28 @@
 package com.github.vkorbut.fctryout.hardware.simulation
 
+import com.github.vkorbut.fctryout.Main._
 import com.github.vkorbut.fctryout.hardware._
 
+import scala.annotation.tailrec
 import scala.collection.immutable.Queue
+import scala.io.StdIn
 
 /**
  * @author Vladimir Korbut v.e.korbut@gmail.com
  */
 
-trait ConsoleAppHardwareSimulation extends MachineHardwareInterface {
-  val buttonNames = 1 to 10 map (_.toString)
+class ConsoleAppHardwareSimulation(val buttonNames:Seq[String]) extends MachineHardwareInterface {
+  
   var buttons: Map[String, (Boolean, Boolean)] = buttonNames.map(b => (b, (true, false))).toMap
   var cashAcceptorEnabled = false
   var pendingEvents: Queue[Event] = Queue[Event]()
 
   override def logError(message: String) = println(s"Error: $message")
 
-  override def returnChange(amount: BigDecimal): Unit = println(s"Returning change: $amount")
+  override def returnChange(amount: BigDecimal): Unit = {
+    println(s"Returning change: $amount")
+    pendingEvents = pendingEvents.enqueue(ChangeReturned(amount))
+  }
 
   override def setCashAcceptorEnabled(active: Boolean) = {
     cashAcceptorEnabled = active
@@ -39,16 +45,17 @@ trait ConsoleAppHardwareSimulation extends MachineHardwareInterface {
     pendingEvents = pendingEvents.enqueue(SellingComplete())
   }
 
-  def cycle(userInput: String) {
+  def processEvents(userInput: String) {
     if (!userInput.isEmpty) {
       parseUserInput(userInput).foreach(v => pendingEvents = pendingEvents.enqueue(v))
     }
+
     while (pendingEvents.nonEmpty) {
       val (event, rest) = pendingEvents.dequeue
       pendingEvents = rest
-      hwEvent(event)
-      printState()
+      hwEventHandler.foreach(_.apply(event))
     }
+    printState()
   }
 
   def parseUserInput(userInput: String): Option[Event] = {
@@ -62,7 +69,7 @@ trait ConsoleAppHardwareSimulation extends MachineHardwareInterface {
         }
         catch {
           case nfe: NumberFormatException =>
-            println("Invalid cash amount " + amount)
+            println(s"Invalid cash amount: $amount")
             None
         }
       case _ =>
@@ -71,5 +78,24 @@ trait ConsoleAppHardwareSimulation extends MachineHardwareInterface {
     }
   }
 
-  def printState()
+  def processConsoleCommands(): Unit = processConsoleCommand()
+  
+  @tailrec
+  private def processConsoleCommand(): Unit = {
+    val line: String = StdIn.readLine().trim
+    if (line != "exit") {
+      processEvents(line)
+      processConsoleCommand()
+    }
+  }
+
+  def printState(): Unit = {
+    println("Buttons:")
+    println(buttons.map {
+      case (name, (_, isHighlighted)) =>
+        val price = runtime.priceForProduct(name).getOrElse(0)
+        if (isHighlighted) s"[$name($price$$)]" else s"$name($price$$)"
+    }.mkString(" "))
+    println("Cash acceptor " + (if (cashAcceptorEnabled) "enabled" else "disabled"))
+  }
 }

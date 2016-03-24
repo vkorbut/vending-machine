@@ -9,7 +9,7 @@ trait MachineHardwareInterface {
   /**
    * Defines buttons which machine does have. 
    */
-  val buttonNames: Seq[String]
+  def buttonNames: Seq[String]
 
   def logError(message: String)
 
@@ -35,7 +35,6 @@ trait MachineHardwareInterface {
    */
   def setButtonEnabled(buttonName: String, enabled: Boolean)
 
-  def priceForProduct(buttonName: String):Option[BigDecimal]
   /**
    * Prepares and realize the product to the user.
    * @param buttonName selected product identified by appropriate button.
@@ -45,5 +44,5 @@ trait MachineHardwareInterface {
   /**
    * Listener to hardware events
    */
-  val hwEvent: Event => Unit
+  var hwEventHandler: Option[Event => Unit] = None
 }
