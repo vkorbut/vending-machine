@@ -93,7 +93,7 @@ class ConsoleAppHardwareSimulation(val buttonNames:Seq[String]) extends MachineH
     println("Buttons:")
     println(buttons.map {
       case (name, (_, isHighlighted)) =>
-        val price = runtime.priceForProduct(name).getOrElse(0)
+        val price = runtime.productPrice(name).getOrElse(0)
         if (isHighlighted) s"[$name($price$$)]" else s"$name($price$$)"
     }.mkString(" "))
     println("Cash acceptor " + (if (cashAcceptorEnabled) "enabled" else "disabled"))

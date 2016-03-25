@@ -25,13 +25,14 @@ class MachineRuntime(hardware: MachineHardwareInterface, val productPrices: Map[
       .getOrElse(currentState)
   }
 
-  def priceForProduct(name: String) = productPrices.get(name)
+  def productPrice = productPrices.get _
 
   type Action = PartialFunction[(State, Event), State]
 
   val cancelAction: Action = {
     case (ProductSelection(deposit, product), CancelPressed()) =>
       product.foreach(hardware.setButtonHighlighted(_, highlighted = false))
+      hardware.setCashAcceptorEnabled(false)
       hardware.returnChange(deposit)
       ReturningChange(deposit, deposit)
   }
@@ -45,28 +46,27 @@ class MachineRuntime(hardware: MachineHardwareInterface, val productPrices: Map[
   }
 
   val commitCashAction: Action = {
-    case (currentState@ProductSelection(deposit, selected), CashCommitted(amount)) =>
+    case (ProductSelection(deposit, None), CashCommitted(amount)) =>
       val newDeposit = deposit + amount
-      selected match {
-        case None =>
-          hardware.returnChange(newDeposit)
-          ReturningChange(newDeposit, newDeposit)
-        case Some(product) =>
-          val price = priceForProduct(product)
-          if (price.isDefined && price.get <= newDeposit) {
-            hardware.prepareAndSellProduct(product)
-            Selling(newDeposit, product)
-          } else {
-            currentState.copy(deposit = newDeposit)
-          }
+      hardware.returnChange(newDeposit)
+      ReturningChange(newDeposit, newDeposit)
+
+    case (currentState@ProductSelection(deposit, Some(product)), CashCommitted(amount)) =>
+      val newDeposit = deposit + amount
+      if (productPrice(product).filter(_ <= newDeposit).isDefined) {
+        hardware.prepareAndSellProduct(product)
+        Selling(newDeposit, product)
+      } else {
+        currentState.copy(deposit = newDeposit)
       }
+
     case (s: Selling, CashCommitted(amount)) => s.copy(deposit = s.deposit + amount)
     case (s: ReturningChange, CashCommitted(amount)) => s.copy(change = s.change + amount)
   }
 
   val sellingCompleteAction: Action = {
     case (Selling(deposit, product), SellingComplete()) =>
-      val change = priceForProduct(product) match {
+      val change = productPrice(product) match {
         case Some(price) => deposit - price;
         case None =>
           hardware.logError(s"No price for product $product. Assuming 0")
